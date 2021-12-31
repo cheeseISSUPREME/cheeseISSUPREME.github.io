@@ -1,4 +1,3 @@
-<!-- Copyright Shaurya Pratap Srivastava -->
 <html>
 <head>
     <link rel="stylesheet" src="https://github.com/pbauerochse/searchable-option-list/blob/master/sol.css" />
@@ -335,7 +334,7 @@ model = Sequential()
                 line += "))\n";
                 code += line
             }
-            code += `\nmodel.compile(loss = document.querySelector("body > div.compile > select").value, optimizer = document.querySelector("body > div.compile3 > select").value, metrics = ["accuracy"])
+            code += `\nmodel.compile(loss = "`+document.querySelector("body > div.compile > select").value+`", optimizer = "`+document.querySelector("body > div.compile3 > select").value+`", metrics = ["accuracy"])
 `;
             navigator.clipboard.writeText(code);
             document.querySelector("#compile4").innerText = "Copied!";
