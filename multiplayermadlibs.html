@@ -157,7 +157,7 @@
                             send_msg({ type: "parashow", content: paras[0] });
                             y = setInterval(function () {
                                 send_msg({ type: "parashow", content: paras[i] });
-                                i += 1;
+                                
                                 if (i > paras.length - 1) {
                                     clearInterval(y);
                                     send_msg({
@@ -166,6 +166,7 @@
                                     }
                                     )
                                 }
+                                i += 1;
                             }, 10000)
 
                         }
