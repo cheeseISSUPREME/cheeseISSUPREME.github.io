@@ -1,0 +1,290 @@
+<html>
+<head>
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.33.0.js"></script>
+</head>
+<body>
+    <div id="alert">
+        <p id="header">Set your username</p>
+        <form id="inpu" onsubmit="go()" autocomplete="off" >
+        <input id="inp" maxlength="16" spellcheck="false" />
+        </form>
+    </div>
+
+    <div id="chatbox">
+
+    </div>
+    <form onsubmit="send_msg({ type: 'chat', content: [document.getElementById('chatinput').value,color] }); document.getElementById('chatinput').value = '';" id="chatform" autocomplete="off">
+    <input id="chatinput" maxlength="16" spellcheck="false" />
+    </form>
+    <div id="written">
+
+    </div>
+    <script>
+        // script to not reload the page after form submit in chat input, why are you looking at this
+        function handleForm(event) { event.preventDefault(); }
+        document.getElementById("chatform").addEventListener('submit', handleForm);
+        document.getElementById("inpu").addEventListener('submit', handleForm);
+
+        
+        host = "";
+        document.getElementById('chatbox').style.display = "none";
+        document.getElementsByTagName('form')[1].style.display = "none";
+        document.getElementById('written').style.display = "none";
+
+        function send_msg(content) {
+
+            var publishPayload = {
+                channel: "MultiplayerGame",
+                message: content
+            }
+            pubnub.publish(publishPayload, function (status, response) {
+                console.log(status, response);
+            })
+        }
+        function start_game(i) {
+            paras = []
+            atstartocc = occupancy - 1;
+            if (i == 0) {
+                send_msg({
+                    type: "startgame",
+                    content: {
+                        text: texts[i]
+                    }
+                }
+                )
+            }
+        }
+        function go() {
+
+            selfid = document.getElementById("inp").value;
+            document.getElementById('chatbox').style.display = "block";
+            document.getElementsByTagName('form')[1].style.display = "block";
+            document.getElementById('alert').style.display = "none";
+            document.getElementById('inpu').onsubmit = "f()";
+            game = false;
+            debugmode = false;
+            paras = []
+            occupancy = 0;
+            atstartocc = 0;
+            
+            function f() {
+                words.push(document.getElementById('inp').value);
+                
+                i += 1;
+
+                document.getElementById('header').innerHTML = msg.message.content.text[1].split(',')[1];
+            }
+            function getRandomColor() {
+                var letters = '0123456789ABCDEF';
+                var color = '#';
+                for (var i = 0; i < 6; i++) {
+                    color += letters[Math.floor(Math.random() * 16)];
+                }
+                return color;
+            }
+            color = getRandomColor();
+            // using pubnub to solve god knows what the hell am i doing
+            pubnub = new PubNub({
+                publishKey: "pub-c-296527a6-0830-4283-bc36-fb341a33917f",
+                subscribeKey: "sub-c-816d3006-ece3-11ea-a728-4ec3aefbf636",
+                uuid: selfid
+            })
+            pubnub.subscribe({
+                channels: ['MultiplayerGame'], withPresence: true
+            });
+
+            pubnub.addListener({
+                status: function (statusEvent) {
+                    if (statusEvent.category === "PNConnectedCategory") {
+                        console.log("Connected")
+
+                    }
+                },
+                message: function (msg) {
+                    if (debugmode == true) {
+                        console.log("Message sender : " + msg.publisher)
+                        console.log("Message content : " + msg.message.content)
+                    }
+                    // what if the message is a person trying to chat 
+                    if (msg.message.type == "chat") {
+                        // add message 
+                        document.getElementById('chatbox').innerHTML += '<p><span style="color:' + msg.message.content[1] + ';">' + msg.publisher + "</span> : " + msg.message.content[0] + "</p>";
+
+                        // automatically scroll
+                        document.getElementById('chatbox').scrollTop = document.getElementById('chatbox').scrollHeight;
+                    }
+                    if (msg.message.type == "action") {
+                        // add message 
+                        document.getElementById('chatbox').innerHTML += '<p>' + msg.message.content + "</p>";
+
+                        // automatically scroll
+                        document.getElementById('chatbox').scrollTop = document.getElementById('chatbox').scrollHeight;
+                    }
+                    // game start
+
+                    if (msg.message.type == "startgame") {
+                        console.log('gottem')
+                        host = msg.publisher
+                        game = true;
+                        words = []
+                        i = 0;
+
+                        para = "";
+                        counter = 0;
+                        for (i in msg.message.content.text[0]) {
+                            if (msg.message.content.text[0][i] == "_") {
+                                words.push(prompt("Give me a(n) "+msg.message.content.text[1].split(',')[counter]))
+                                para += words[counter]
+                                counter += 1
+                            }
+                            else {
+                                para += msg.message.content.text[0][i]
+                            }
+                        }
+
+                        send_msg({
+                            type: 'para',
+                            content: para
+                        })
+
+
+                    }
+
+                    if (msg.message.type == 'para' && game == true && host == selfid) {
+                        paras.push([msg.message.content, msg.publisher]);
+                        if (atstartocc == paras.length) {
+                            i = Number(1);
+                            send_msg({ type: "parashow", content: paras[0] });
+                            y = setInterval(function () {
+                                send_msg({ type: "parashow", content: paras[i] });
+                                i += 1;
+                                if (i > paras.length - 1) {
+                                    clearInterval(y);
+                                    send_msg({
+                                        type: "clear",
+                                        content: {}
+                                    }
+                                    )
+                                }
+                            }, 10000)
+
+                        }
+                    }
+                    if (msg.message.type == 'parashow') {
+                        document.getElementById('written').style.display = "block";
+                        document.getElementById('written').innerHTML = "<p>Name : " + msg.message.content[1] + "</p><br />Story:<p>" + msg.message.content[0] + "</p>";
+                    }
+                    if (msg.message.type == 'clear') {
+                        document.getElementById('written').style.display = "none";
+                    }
+                },
+                presence: function (presenceEvent) {
+                    if (presenceEvent.action == 'join') {
+                        document.getElementById('chatbox').innerHTML += '<p>' + presenceEvent.uuid + " joined</p>";
+                    }
+                    if (presenceEvent.action == 'leave') {
+                        document.getElementById('chatbox').innerHTML += '<p>' + presenceEvent.uuid + " left</p>";
+                    }
+                }
+            })
+            setInterval(function () {
+                pubnub.hereNow({
+                    channels: ["MultiplayerGame"],
+                    includeState: true,
+                }).then(yis => {
+                    occupancy = yis.totalOccupancy;
+                });
+            }, 1000)
+            
+            texts = [[
+                `Today I went to the zoo. I saw a(n) _ _ jumping up and down in its tree.
+He _ _ through the large tunnel that led to its _ _ . I got some peanuts and passed
+them through the cage to a gigantic gray _ towering above my head. Feeding that animal made
+me hungry. I went to get a _ scoop of ice cream. It filled my stomach. Afterwards I had to _ _ to catch our bus.
+When I got home I _ my mom for a _ day at the zoo`, "adjective,noun,verb or past tense,adverb,adjective,noun,noun,adjective,verb,adverb,verb or past tense,adjective"
+            ]]
+
+            
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@100&display=swap');
+        
+        #chatbox {
+            position: absolute;
+            bottom: 20px;
+            left: 0px;
+            width: 150px;
+            height: 300px;
+            border: 1px solid black;
+            overflow-y: scroll;
+            word-wrap: break-word;
+            padding: 5px;
+            border-radius: 10px;
+            border: 1px solid #0094ff;
+            font-family:Montserrat;
+            font-weight:bold;
+        }
+        #alert{
+            position:fixed;
+            top:50%;
+            left:50%;
+            transform:translate(-50%,-50%);
+            border-radius:20px;
+            height:50%;
+            width:50%;
+            border:1px solid black;
+        }
+        #header {
+            text-align: center;
+            font-family: Montserrat;
+            font-weight: bold;
+        }
+        #inp {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%,-50%);
+            border-radius: 20px;
+            outline: none;
+            padding: 10px;
+            border: 1px solid black;
+            font-family: Montserrat;
+            font-weight: bold;
+            text-align: center;
+        }
+        #written {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%,-50%);
+            width: 300px;
+            border: 1px solid black;
+            display: none;
+            word-wrap: break-word;
+            padding: 20px;
+            border: 3px solid #0094ff;
+            border-radius: 25px;
+            font-family: Montserrat;
+            font-weight: bold;
+
+        }
+        #chatinput {
+            position: absolute;
+            width: 157px;
+            bottom: 0px;
+            height: 20px;
+            padding: 5px;
+            border-radius: 10px;
+            border: 1px solid #0094ff;
+            outline: none;
+            font-family: Montserrat;
+            font-weight: bold;
+        }
+        body{
+            margin:0px;
+
+        }
+    </style>
+</body>
+</html>
